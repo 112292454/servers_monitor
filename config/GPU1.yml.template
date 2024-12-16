@@ -1,0 +1,20 @@
+name: 'gpu1'
+ip: your.gpu.server.nginx.show
+passwd: 'your_password'
+monitoring:
+  reachable: true
+  ssh_accessible: true
+  cpu_load: true
+  memory_load: true
+  gpu_load: true
+  gpu_mem: true
+  gpu_using_users: false
+  gpu_usage_per_user: true
+  network_IO: true
+show_info:
+  ip: 8.8.8.8
+  ssh_port: '114514'
+  ssh_connect_cmd: "`ssh -p {port} user@{ip}`"
+  gpu_info_cmd: "`gpustat` or `nvtop` or `nvitop`(install by pip)"
+  cpu_info_cmd: "`btop`"
+  max_gpu_mem: 80G
