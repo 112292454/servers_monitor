@@ -5,7 +5,7 @@ import paramiko
 
 
 class MYSSHClient:
-    def __init__(self, host, port=22, username="gzy", password=None):
+    def __init__(self, host, port=22, username="root", password=None):
         self.host = host
         self.port = port
         self.username = username
@@ -40,7 +40,7 @@ def create_ssh_clients(configs):
     """Create SSH clients for each server in the configuration."""
     ssh_clients = {}
     for name, server in configs.items():
-        ssh_clients[name] = MYSSHClient(server["ip"], server["show_info"].get("ssh_port", 22),password=server.get('passwd',None))
+        ssh_clients[name] = MYSSHClient(server["ip"], server["show_info"].get("ssh_port", 22),password=server.get('passwd',None),username=server.get('user','root'))
         ssh_clients[name].connect()
     return ssh_clients
 

@@ -1,5 +1,6 @@
 name: 'gpu1'
 ip: your.gpu.server.nginx.show
+user: 'gzy'
 passwd: 'your_password'
 monitoring:
   reachable: true
