@@ -1,3 +1,4 @@
+import signal
 from datetime import datetime
 
 import yaml
@@ -50,6 +51,8 @@ def monitor_server(server, ssh_client):
     status = {}
     status['is_up'] = is_server_up(server['ip'])
     status['is_ssh_up'] = is_ssh_up(ssh_client)
+    if not status['is_up']:
+        return status
 
     # Collect metrics for all items, whether displayed or not
     for key in server['monitoring']:
@@ -84,7 +87,7 @@ def background_monitor(interval=DEFAULT_UPDATE_INTERVAL):
         # 获取每台服务器的状态并保存到文件
         for name,server in configs.items():
             # 获取服务器的监控状态
-            status = monitor_server(server, clients[name])
+            status = monitor_server(server, clients.get(name,None))
             # 添加时间戳标识
             status["last_checked"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             status["timestamp_ms"] = int(time.time() * 1000)
@@ -92,13 +95,14 @@ def background_monitor(interval=DEFAULT_UPDATE_INTERVAL):
             # 将状态保存到status目录中的JSON文件
             status_file = os.path.join(STATUS_DIR, f"{name}.jsonl")
             with open(status_file, 'a') as f:  # Append mode
-                f.write('\n' + json.dumps(status))  # Write each status as a separate line
+                f.write('\n' + json.dumps(status).strip('\0'))  # Write each status as a separate line
 
             # 记录日志（可选）
             log_event(name, f"Status updated: {status}")
 
         # 每隔 `interval` 秒执行一次监控
         time.sleep(interval)
+    print("ERROR: Background monitor stopped.")
 
 
 def main():
@@ -136,12 +140,12 @@ def main():
                 gr.HTML(
                     value=lambda: dp.display_is_up(server),
                     label="Server Status",
-                    every=DEFAULT_UPDATE_INTERVAL,
+                    every=10,
                 )
                 gr.HTML(
                     value=lambda: dp.display_ssh_status(server),
                     label="SSH Status",
-                    every=DEFAULT_UPDATE_INTERVAL,
+                    every=10,
                 )
 
             # 动态绑定监控项数据
@@ -193,35 +197,38 @@ def main():
             #         interactive=False,
             #     )
             if server["monitoring"].get("gpu_using_users", False):
-                gr.Textbox(
-                    value=lambda: dp.display_gpu_using_users(server),
-                    label="Using GPU Users",
-                    every=DEFAULT_UPDATE_INTERVAL,
-                    interactive=False,
-                )
+                # gr.Textbox(
+                #     value=lambda: dp.display_gpu_using_users(server),
+                #     label="Using GPU Users",
+                #     every=DEFAULT_UPDATE_INTERVAL,
+                #     interactive=False,
+                # )
+                plot_gpu_memory_usage_ranking(server['name'])
             if server["monitoring"].get("gpu_usage_per_user", False):
-                gr.Textbox(
-                    value=lambda: dp.display_gpu_usage_per_user(server),
-                    label="GPU Usage per User",
-                    every=DEFAULT_UPDATE_INTERVAL,
-                    interactive=False,
-                )
+                # gr.Textbox(
+                #     value=lambda: dp.display_gpu_usage_per_user(server),
+                #     label="GPU Usage per User",
+                #     every=DEFAULT_UPDATE_INTERVAL,
+                #     interactive=False,
+                # )
                 plot_native_gpu_usage_per_user(server)
 
             if server["monitoring"].get("network_IO", False):
-                gr.Textbox(
-                    value=lambda: dp.display_network_io(server),
-                    label="Network I/O",
-                    every=DEFAULT_UPDATE_INTERVAL,
-                    interactive=False,
-                )
+                # gr.Textbox(
+                #     value=lambda: dp.display_network_io(server),
+                #     label="Network I/O",
+                #     every=DEFAULT_UPDATE_INTERVAL,
+                #     interactive=False,
+                # )
+                plot_network_io(server['name'])
             if server["monitoring"].get("disk_IO", False):
-                gr.Textbox(
-                    value=lambda: dp.display_disk_io(server),
-                    label="Disk I/O",
-                    every=DEFAULT_UPDATE_INTERVAL,
-                    interactive=False,
-                )
+                # gr.Textbox(
+                #     value=lambda: dp.display_disk_io(server),
+                #     label="Disk I/O",
+                #     every=DEFAULT_UPDATE_INTERVAL,
+                #     interactive=False,
+                # )
+                plot_disk_io(server['name'])
     
             gr.Textbox(
                 value=lambda: dp.display_last_checked(server),
@@ -314,8 +321,22 @@ def main():
         for name,server in configs.items():
             server_tab(server)
 
-        app.launch(server_name="0.0.0.0", ssl_verify=False, server_port=18000)
+        app.launch(server_name="0.0.0.0",server_port=18000)
 
+
+
+# Function to stop the application after 2 hours
+def stop_app_after_delay(delay_seconds):
+    time.sleep(delay_seconds)
+    print("Shutting down the application after 2 hours...")
+    os.kill(os.getpid(), signal.SIGINT)  # Send SIGINT to terminate gracefully
 
 if __name__ == "__main__":
+    # Start the shutdown timer in a separate thread
+    delay_seconds = 2 * 60 * 60  # 2 hours in seconds
+    shutdown_thread = threading.Thread(target=stop_app_after_delay, args=(delay_seconds,))
+    shutdown_thread.daemon = True  # Make sure this thread does not block the program from exiting
+    shutdown_thread.start()
+
+    # Start the application
     main()

@@ -21,7 +21,7 @@ def display_ssh_status(server):
 def display_cpu_load(server):
     # def inner():
     status = last.get_server_status(server)
-    return status["cpu_load"]
+    return status.get("cpu_load","N/A")
     # return inner
 
 def display_memory_load(server):

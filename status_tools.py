@@ -18,15 +18,17 @@ class MYSSHClient:
         if self.client is None:
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            self.client.connect(self.host, port=self.port, username=self.username, password=self.password)
+            self.client.connect(self.host, port=self.port, username=self.username, password=self.password,timeout=10)
 
     def execute_command(self, command):
         """Execute a command on the remote server."""
-        if not self.client:
-            self.connect()
+        try:
+            if not self.client:
+                self.connect()
+        except Exception as e:
+            print(f"execute error :connect to {self.host} Error: {str(e)}")
+            return None, None, None
         return self.client.exec_command(command)
-        # stdin, stdout, stderr = self.client.exec_command(command)
-        # return stdout.read().decode()
 
     def close(self):
         """Close the SSH connection."""
@@ -40,8 +42,13 @@ def create_ssh_clients(configs):
     """Create SSH clients for each server in the configuration."""
     ssh_clients = {}
     for name, server in configs.items():
-        ssh_clients[name] = MYSSHClient(server["ip"], server["show_info"].get("ssh_port", 22),password=server.get('passwd',None),username=server.get('user','root'))
-        ssh_clients[name].connect()
+        try:
+            temp_client=MYSSHClient(server["ip"], server["show_info"].get("ssh_port", 22),password=server.get('passwd',None),username=server.get('user','root'),)
+            temp_client.connect()
+            ssh_clients[name] = temp_client
+        except Exception as e:
+            print(f"init ssh for server {name}  Error: {str(e)},skip {name}")
+            continue
     return ssh_clients
 
 
@@ -65,7 +72,7 @@ def is_server_up(host):
 
 def is_ssh_up(ssh_client: MYSSHClient):
     """Check if the server is up and running by pinging the host."""
-    return ssh_client.client is not None
+    return ssh_client is not None and ssh_client.client is not None
 
 
 def get_cpu_load(ssh_client):
@@ -82,7 +89,7 @@ def get_cpu_load(ssh_client):
         return f"{load_1min.strip()}%"
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"0%"
 
 
 def get_memory_load(ssh_client):
@@ -98,7 +105,7 @@ def get_memory_load(ssh_client):
         return memory_usage + ' GB'
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"0/0 GB"
 
 
 def get_gpu_load(ssh_client):
@@ -115,7 +122,7 @@ def get_gpu_load(ssh_client):
         return ", ".join([f"{usage}%" for usage in gpu_usages])
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"0%"
 
 
 def get_gpu_mem(ssh_client):
@@ -132,7 +139,7 @@ def get_gpu_mem(ssh_client):
         return ", ".join([f"{mem}MB" for mem in gpu_memories])
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"0MB"
 
 
 def get_gpu_using_users(ssh_client):
@@ -153,7 +160,7 @@ def get_gpu_using_users(ssh_client):
         return users
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Error: No users using"
 
 
 def get_gpu_load_per_user(ssh_client):
@@ -176,7 +183,7 @@ def get_gpu_load_per_user(ssh_client):
         return usage
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"no_user 0MB"
 
 
 def get_network_IO(ssh_client):
@@ -206,7 +213,7 @@ def get_network_IO(ssh_client):
         return interfaces
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return {}
 
 
 def get_network_IO_bandwidth(ssh_client):
@@ -254,7 +261,7 @@ def get_network_IO_bandwidth(ssh_client):
         return f"Up/Down: {round(upload_bandwidth, 2)}/{round(download_bandwidth, 2)} (MB/s)"
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Up/Down: 0/0 (MB/s)"
 
 
 def get_disk_IO(ssh_client):
@@ -291,4 +298,4 @@ def get_disk_IO(ssh_client):
 
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Read/Write: 0/0 (MB/s)"
